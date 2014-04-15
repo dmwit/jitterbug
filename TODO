@@ -1,0 +1,21 @@
+Possible additional features:
+* give some feedback on cumulative error (e.g. RMS of per-beat error)
+* have some "reward bands" near the target mark
+* add audio cues
+* let the visual metronome marks fade out (or maybe some kind of cross-fade from visual to aural)
+* rhythm (i.e. not just a completely steady beat)
+* alternate input methods (e.g. microphone)
+* melody (requires microphone input, probably)
+* synch to music
+
+Impact will be low for all of these features, since the intended audience is
+one person no matter what. So leave that column out in the analysis below.
+
+feature                     resources   uncertainty     value   risk assessment
+synch with music            high        high            medium        18
+audio cues                  medium      medium          high          12
+microphone input            medium      high            low            6
+reward bands                medium      low             medium         4
+rhythm                      medium      low             medium         4
+cumulative error            low         low             low            1
+visual/aural cross-fade     low         low             low            1
