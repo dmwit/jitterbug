@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, NoMonomorphismRestriction #-}
 import Control.Applicative
 import Control.Concurrent
 import Control.Monad
@@ -13,8 +13,10 @@ import Graphics.UI.Gtk.Cairo
 import Text.Printf
 
 data GameState
+	--             keypresses
 	= Initializing [UTCTime]
-	| Playing UTCTime NominalDiffTime
+	--        start   frequency       past error margins
+	| Playing UTCTime NominalDiffTime [NominalDiffTime]
 	deriving (Eq, Ord)
 
 main = do
@@ -32,39 +34,61 @@ main = do
 	widgetShowAll w
 
 	forkIO $ forever (postGUIAsync (widgetQueueDraw da) >> threadDelay 5000)
+	forkIO $ forever (postGUIAsync (modifyIORef r garbageCollect) >> threadDelay 100000000)
 	mainGUI
 
 mean ts = sum ts / genericLength ts
 diff ts = zipWith diffUTCTime ts (tail ts)
 
-errorMargin start freq t = 2 * signedMargin / freq where
+errorMargin start freq t = signedMargin / freq where
 	rawMargin = diffUTCTime t start `mod'` freq
 	signedMargin = rawMargin - if rawMargin > freq / 2 then freq else 0
 
 keyPressed r = tryEvent $ do
+	t <- liftIO getCurrentTime
 	"space" <- eventKeyName
 	liftIO $ do
-		t <- getCurrentTime
 		s <- readIORef r
 		case s of
-			Initializing ts | length ts >= 5 -> writeIORef r (Playing (last ts) ((mean . diff) (t:ts)))
+			Initializing ts | length ts >= 5 -> writeIORef r (Playing (last ts) ((mean . diff) (t:ts)) [])
 			                | otherwise      -> writeIORef r (Initializing (t:ts))
-			Playing start freq -> printf "%5d\n" (round (errorMargin start freq t * 1000) :: Int)
+			Playing start freq ms -> do
+				let m = errorMargin start freq t
+				writeIORef r (Playing start freq (m:ms))
+				printf "%5d\n" (round (errorMargin start freq t * 2000) :: Int)
 
 exposed r da = join . liftIO $ readIORef r >>= \case
-	Playing start freq -> do
+	Playing start freq ms -> do
 		t <- getCurrentTime
 		w <- fromIntegral <$> widgetGetAllocatedWidth  da
 		h <- fromIntegral <$> widgetGetAllocatedHeight da
-		let m = realToFrac (errorMargin start freq t)
-		    x = (atan (m*10)*2/pi*w + w)/2
+		let m = errorMargin start freq t
 		return $ do
+			scale w h
+			setLineWidth 0.01
+
+			-- target mark
 			setSourceRGB 1 0 0
-			moveTo (w/2) 0
-			lineTo (w/2) h
+			lineForMargin 0 1 0
 			stroke
+
+			-- metronome marks
 			setSourceRGB 0 0 0
-			moveTo x 0
-			lineTo x h
+			mapM_ (lineForMargin 0 1) [m-10, m-9 .. m+10]
+			moveTo 0 0 >> lineTo 1 0
+			moveTo 0 1 >> lineTo 1 1
+			stroke
+
+			-- past keypress marks
+			setSourceRGB 0 0.5 0
+			forM_ (zip [1..numHistoryPoints] ms) $ \(i,m) -> do
+				lineForMargin (1-i/numHistoryPoints) (1-(i-1)/numHistoryPoints) m
 			stroke
 	_ -> return (return ())
+
+lineForMargin x1 x2 m = let y = (atan (realToFrac m*10)*2/pi + 1)/2 in moveTo x1 y >> lineTo x2 y
+
+numHistoryPoints = 10
+
+garbageCollect (Playing start freq ms) = Playing start freq (take numHistoryPoints ms)
+garbageCollect s = s
