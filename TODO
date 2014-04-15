@@ -19,3 +19,9 @@ reward bands                medium      low             medium         4
 rhythm                      medium      low             medium         4
 cumulative error            low         low             low            1
 visual/aural cross-fade     low         low             low            1
+
+some resources:
+* description of a beat detection algorithm: https://www.clear.rice.edu/elec301/Projects01/beat_sync/beatalgo.html
+* Haskell DSP code: http://hackage.haskell.org/package/dsp
+* could ask Brent what he knows about Haskell+music, since he did the FARM thing
+* could look for that "Haskell live-coding music" software for ideas about how to generate/play sound programmatically
